@@ -78,7 +78,7 @@
                     headers: { 
                         "Authorization": `Bearer ${OPENROUTER_KEY}`,
                         "Content-Type": "application/json",
-                        "HTTP-Referer": window.location.href, // OpenRouter möchte wissen, woher die Anfrage kommt
+                        "HTTP-Referer": window.location.origin, // OpenRouter möchte wissen, woher die Anfrage kommt
                         "X-Title": "AI Dungeon Trinity"
                     },
                     body: JSON.stringify({
@@ -115,4 +115,3 @@
     </script>
 </body>
 </html>
-
