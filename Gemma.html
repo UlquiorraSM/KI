@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KI - Edition</title>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: #e0e0e0; display: flex; flex-direction: column; height: 100vh; margin: 0; }
+        
+        /* Key-Eingabe Overlay */
+        #setup-overlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: #121212; display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; z-index: 100; 
+        }
+        .setup-box { background: #1e1e1e; padding: 30px; border-radius: 10px; border: 1px solid #4caf50; text-align: center; }
+        
+        #log { flex: 1; overflow-y: auto; padding: 20px; border-bottom: 1px solid #333; display: none; }
+        #input-area { padding: 20px; display: none; gap: 10px; background: #1e1e1e; }
+        
+        input { flex: 1; padding: 12px; border-radius: 5px; border: none; background: #333; color: white; }
+        .key-input { width: 300px; margin-bottom: 15px; display: block; }
+        
+        button { padding: 10px 20px; background: #4caf50; border: none; color: white; cursor: pointer; border-radius: 5px; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        .thinking { color: #888; font-style: italic; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+
+    <div id="setup-overlay">
+        <div class="setup-box">
+            <h2>RPG Setup</h2>
+            <p>Bitte gib deinen Hugging Face Token ein:</p>
+            <input type="password" id="hfTokenInput" class="key-input" placeholder="hf_...">
+            <button onclick="startGame()">Abenteuer starten</button>
+            <p style="font-size: 0.7em; color: #888; margin-top: 10px;">Der Key wird nicht gespeichert und bleibt nur in dieser Sitzung aktiv.</p>
+        </div>
+    </div>
+
+    <div id="log">KI: Was tust du?</div>
+    
+    <div id="input-area">
+        <input type="text" id="userInput" placeholder="Was tust du?" onkeydown="if(event.key==='Enter') sendToAI()">
+        <button id="sendBtn" onclick="sendToAI()">Senden</button>
+    </div>
+
+    <script>
+        let USER_HF_TOKEN = ""; 
+        const MODEL_URL = "https://router.huggingface.co/hf/google/gemma-3-27b-it";
+
+        function startGame() {
+            const keyInput = document.getElementById('hfTokenInput').value.trim();
+            if (keyInput.startsWith("hf_")) {
+                USER_HF_TOKEN = keyInput;
+                document.getElementById('setup-overlay').style.display = 'none';
+                document.getElementById('log').style.display = 'block';
+                document.getElementById('input-area').style.display = 'flex';
+            } else {
+                alert("Bitte einen gültigen Hugging Face Token eingeben (beginnt mit hf_)");
+            }
+        }
+
+        async function sendToAI() {
+            const inputField = document.getElementById('userInput');
+            const log = document.getElementById('log');
+            const sendBtn = document.getElementById('sendBtn');
+            const userText = inputField.value;
+
+            if (!userText) return;
+
+            inputField.disabled = true;
+            sendBtn.disabled = true;
+
+            log.innerHTML += `<p><strong>> ${userText}</strong></p>`;
+            inputField.value = "";
+            
+            const statusMsg = document.createElement("p");
+            statusMsg.className = "thinking";
+            statusMsg.innerText = "... Gemma 3 27B denkt nach ...";
+            log.appendChild(statusMsg);
+            log.scrollTop = log.scrollHeight;
+
+            try {
+                const response = await fetch(MODEL_URL, {
+                    method: "POST",
+                    headers: { 
+                        "Authorization": `Bearer ${USER_HF_TOKEN}`,
+                        "Content-Type": "application/json" 
+                    },
+                    body: JSON.stringify({
+                        inputs: "Du bist ein erfahrener Game Master. Antworte kreativ auf Deutsch auf die Aktion des Spielers: " + userText,
+                        parameters: {
+                            max_new_tokens: 500,
+                            temperature: 0.8,
+                            return_full_text: false
+                        }
+                    })
+                });
+
+                const data = await response.json();
+                statusMsg.remove();
+
+                let aiResponse = "";
+                if (data.error) {
+                    aiResponse = "Fehler: " + data.error;
+                } else if (Array.isArray(data) && data[0].generated_text) {
+                    aiResponse = data[0].generated_text;
+                } else if (data.generated_text) {
+                    aiResponse = data.generated_text;
+                } else {
+                    aiResponse = "Keine Antwort erhalten. Prüfe deinen Key!";
+                }
+
+                log.innerHTML += `<p>${aiResponse.replace(/\n/g, '<br>')}</p>`;
+
+            } catch (e) {
+                statusMsg.remove();
+                log.innerHTML += `<p style="color:red">Verbindungsfehler! (CORS oder Netzwerk)</p>`;
+                console.error(e);
+            }
+
+            inputField.disabled = false;
+            sendBtn.disabled = false;
+            inputField.focus();
+            log.scrollTop = log.scrollHeight;
+        }
+    </script>
+</body>
+</html>
